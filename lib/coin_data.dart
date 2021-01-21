@@ -1,3 +1,6 @@
+const String kApiKey = 'D4D26595-14CE-41BF-8BEF-FBE72F5D2909';
+const String coinApiURL = 'https://rest.coinapi.io/v1/exchangerate';
+
 const List<String> currenciesList = [
   'AUD',
   'BRL',
