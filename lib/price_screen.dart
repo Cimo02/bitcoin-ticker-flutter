@@ -13,9 +13,12 @@ class PriceScreen extends StatefulWidget {
 class _PriceScreenState extends State<PriceScreen> {
   String selectedCurrency = 'AUD';
 
-  String btcExchangeRate = '0.0';
-  String ethExchangeRate = '0.0';
-  String ltcExchangeRate = '0.0';
+  // default exchange rate values
+  var exchangeRates = {
+    'BTC': '0.0',
+    'ETH': '0.0',
+    'LTC': '0.0',
+  };
 
   DropdownButton<String> androidDropdown() {
     List<DropdownMenuItem<String>> dropdownItems = [];
@@ -61,36 +64,49 @@ class _PriceScreenState extends State<PriceScreen> {
   //   return Text("Couldn't load currencies");
   // }
 
-  Future<double> getCoinData() async {
-    // repeat this 3 times for each crypto-currency
-    String url = '$coinApiURL/BTC/$selectedCurrency?apikey=$kApiKey';
-    http.Response response = await http.get(url);
+  Future<Map<String, String>> updateCoinData() async {
+    var urls = {
+      'BTC': '$coinApiURL/BTC/$selectedCurrency?apikey=$kApiKey',
+      'ETH': '$coinApiURL/ETH/$selectedCurrency?apikey=$kApiKey',
+      'LTC': '$coinApiURL/LTC/$selectedCurrency?apikey=$kApiKey',
+    };
 
-    if (response.statusCode == 200) {
-      String data = response.body;
+    var newRates = {
+      'BTC': '0.0',
+      'ETH': '0.0',
+      'LTC': '0.0',
+    };
 
-      var decodedData =
-          jsonDecode(data); //TODO: you only need to call jsonDecode() once!!
+    await urls.forEach((key, value) async {
+      http.Response response = await http.get(value);
 
-      return decodedData['rate'];
-    } else {
-      print("HTTP Error: ${response.statusCode}");
-      return 0.0;
-    }
+      if (response.statusCode == 200) {
+        String data = response.body;
+
+        var decodedData =
+            jsonDecode(data); //TODO: you only need to call jsonDecode() once!!
+
+        newRates[key] = (decodedData['rate']).toStringAsFixed(2);
+        print('Updated $key price to ${newRates[key]}');
+      } else {
+        print("HTTP Error: ${response.statusCode}");
+      }
+    });
+
+    return newRates;
   }
 
   void updateUI(var userSelection) async {
-    double newRate = await getCoinData();
+    var newRates = await updateCoinData();
 
     setState(() {
+      exchangeRates = newRates;
       //determine platform to see what type of data userSelection is
       if (Platform.isIOS) {
         selectedCurrency = currenciesList[userSelection];
       } else {
         selectedCurrency = userSelection;
       }
-
-      btcExchangeRate = (newRate).toStringAsFixed(2);
     });
   }
 
@@ -118,11 +134,14 @@ class _PriceScreenState extends State<PriceScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               CurrencyCard(
-                  displayText: '1 BTC = $btcExchangeRate $selectedCurrency'),
+                  displayText:
+                      '1 BTC = ${exchangeRates['BTC']} $selectedCurrency'),
               CurrencyCard(
-                  displayText: '1 ETH = $ethExchangeRate $selectedCurrency'),
+                  displayText:
+                      '1 ETH = ${exchangeRates['ETH']} $selectedCurrency'),
               CurrencyCard(
-                  displayText: '1 LTC = $ltcExchangeRate $selectedCurrency'),
+                  displayText:
+                      '1 LTC = ${exchangeRates['LTC']} $selectedCurrency'),
             ],
           ),
           Container(
