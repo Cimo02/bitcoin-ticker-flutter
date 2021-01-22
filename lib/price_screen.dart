@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'coin_data.dart';
 import 'dart:io' show Platform;
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 
 class PriceScreen extends StatefulWidget {
   @override
@@ -12,13 +10,8 @@ class PriceScreen extends StatefulWidget {
 
 class _PriceScreenState extends State<PriceScreen> {
   String selectedCurrency = 'AUD';
-
-  // default exchange rate values
-  var exchangeRates = {
-    'BTC': '0.0',
-    'ETH': '0.0',
-    'LTC': '0.0',
-  };
+  Map<String, String> coinValues = {};
+  bool isWaiting = false;
 
   DropdownButton<String> androidDropdown() {
     List<DropdownMenuItem<String>> dropdownItems = [];
@@ -34,7 +27,7 @@ class _PriceScreenState extends State<PriceScreen> {
       value: selectedCurrency,
       items: dropdownItems,
       onChanged: (value) {
-        updateUI(value);
+        getData(value);
       },
     );
   }
@@ -42,13 +35,18 @@ class _PriceScreenState extends State<PriceScreen> {
   CupertinoPicker iOSPicker() {
     List<Text> pickerItems = [];
     for (String currency in currenciesList) {
-      pickerItems.add(Text(currency));
+      pickerItems.add(Text(
+        currency,
+        style: TextStyle(
+          color: Colors.white,
+        ),
+      ));
     }
 
     return CupertinoPicker(
       itemExtent: 32.0,
       onSelectedItemChanged: (selectedIndex) {
-        updateUI(selectedIndex);
+        getData(selectedIndex);
       },
       children: pickerItems,
     );
@@ -64,50 +62,26 @@ class _PriceScreenState extends State<PriceScreen> {
   //   return Text("Couldn't load currencies");
   // }
 
-  Future<Map<String, String>> updateCoinData() async {
-    var urls = {
-      'BTC': '$coinApiURL/BTC/$selectedCurrency?apikey=$kApiKey',
-      'ETH': '$coinApiURL/ETH/$selectedCurrency?apikey=$kApiKey',
-      'LTC': '$coinApiURL/LTC/$selectedCurrency?apikey=$kApiKey',
-    };
-
-    var newRates = {
-      'BTC': '0.0',
-      'ETH': '0.0',
-      'LTC': '0.0',
-    };
-
-    await urls.forEach((key, value) async {
-      http.Response response = await http.get(value);
-
-      if (response.statusCode == 200) {
-        String data = response.body;
-
-        var decodedData =
-            jsonDecode(data); //TODO: you only need to call jsonDecode() once!!
-
-        newRates[key] = (decodedData['rate']).toStringAsFixed(2);
-        print('Updated $key price to ${newRates[key]}');
-      } else {
-        print("HTTP Error: ${response.statusCode}");
-      }
-    });
-
-    return newRates;
-  }
-
-  void updateUI(var userSelection) async {
-    var newRates = await updateCoinData();
-
-    setState(() {
-      exchangeRates = newRates;
-      //determine platform to see what type of data userSelection is
-      if (Platform.isIOS) {
+  void getData(var userSelection) async {
+    isWaiting = true;
+    if (Platform.isIOS) {
+      setState(() {
         selectedCurrency = currenciesList[userSelection];
-      } else {
+      });
+    } else {
+      setState(() {
         selectedCurrency = userSelection;
-      }
-    });
+      });
+    }
+    try {
+      var data = await CoinData().getCoinData(selectedCurrency);
+      isWaiting = false;
+      setState(() {
+        coinValues = data;
+      });
+    } catch (e) {
+      print(e);
+    }
   }
 
 // Lifecycle Methods
@@ -116,7 +90,7 @@ class _PriceScreenState extends State<PriceScreen> {
     super.initState();
     // set the starting state for the app, use Platform to determine what to use as initalSelection
     var initialSelection = Platform.isIOS ? 0 : 'AUD';
-    updateUI(initialSelection);
+    getData(initialSelection);
   }
 
   @override
@@ -134,14 +108,17 @@ class _PriceScreenState extends State<PriceScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               CurrencyCard(
-                  displayText:
-                      '1 BTC = ${exchangeRates['BTC']} $selectedCurrency'),
+                  displayText: isWaiting
+                      ? '?'
+                      : '1 BTC = ${coinValues['BTC']} $selectedCurrency'),
               CurrencyCard(
-                  displayText:
-                      '1 ETH = ${exchangeRates['ETH']} $selectedCurrency'),
+                  displayText: isWaiting
+                      ? '?'
+                      : '1 ETH = ${coinValues['ETH']} $selectedCurrency'),
               CurrencyCard(
-                  displayText:
-                      '1 LTC = ${exchangeRates['LTC']} $selectedCurrency'),
+                  displayText: isWaiting
+                      ? '?'
+                      : '1 LTC = ${coinValues['LTC']} $selectedCurrency'),
             ],
           ),
           Container(
@@ -158,7 +135,7 @@ class _PriceScreenState extends State<PriceScreen> {
 }
 
 class CurrencyCard extends StatelessWidget {
-  String displayText;
+  final String displayText;
 
   CurrencyCard({@required this.displayText});
 
